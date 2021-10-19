@@ -7,7 +7,7 @@ ARCHITECTURE = [
     {'neuron_number': 5, 'activation': 'relu'},
     {'neuron_number': 4, 'activation': 'sigmoid'},
 ]
-TRAIN = np.array((
+DATA = np.array((
     [1, 3, 4, 0],
     [4, 3, 2, 0],
     [2, 8, 4, 0],
@@ -24,11 +24,12 @@ TARGETS = np.array((
 
 
 class Net:
-    def __init__(self, architecture, first_layers=None, weights=None, biases=None, batch_size=1):
+    def __init__(self, architecture, targets, first_layers=None, weights=None, biases=None, batch_size=2):
         self.architecture = architecture
         self.layers = []
         self.weights = []
         self.biases = []
+        self.targets = targets
         self.batch_size = batch_size
 
         self.create_layers()
@@ -36,8 +37,8 @@ class Net:
         self.create_biases()
         if first_layers is not None:
             i = 0
-            while i < min(len(first_layers), batch_size, self.architecture[0]['neuron_number']):
-                self.layers[i][0] = first_layers[i]
+            while i < min(len(first_layers), batch_size):
+                self.layers[0][i] = first_layers[i]
                 i += 1
         if weights is not None:
             self.weights = weights
@@ -67,12 +68,16 @@ class Net:
         # TODO change to using functions?
         for layer_pair_number in range(len(self.architecture) - 1):
             if self.architecture[layer_pair_number + 1]['activation'] == 'relu':
-                self.layers[layer_pair_number + 1] = np.maximum(self.layers[layer_pair_number]
-                                                                @ self.weights[layer_pair_number]
-                                                                + self.biases[layer_pair_number], 0)
+                self.layers[layer_pair_number + 1] = np.maximum(np.einsum('...i,...ij->...j',
+                                                                          self.layers[layer_pair_number],
+                                                                          self.weights[layer_pair_number])
+                                                                + self.biases[layer_pair_number],
+                                                                0)
             if self.architecture[layer_pair_number + 1]['activation'] == 'sigmoid':
-                self.layers[layer_pair_number + 1] = 1 / (1 + np.exp(-self.layers[-2] @ self.weights[-1]
-                                                                     + self.biases[-1]))
+                self.layers[layer_pair_number + 1] = 1 / (1 + np.exp(np.einsum('...i,...ij->...j',
+                                                                               self.layers[layer_pair_number],
+                                                                               self.weights[layer_pair_number])
+                                                                     + self.biases[layer_pair_number]))
 
     """
     def backpropagate(self):
@@ -80,6 +85,10 @@ class Net:
             if self.architecture[layer_pair_number + 1]['activation'] == 'relu':
                 self.layers[layer_pair_number + 1] = 
     """
+
+    def calculate_loss(self):
+        loss = -np.sum(self.targets[:self.batch_size] * np.log2(self.layers[-1]))
+        return loss
 
     def output_layers(self):
         for layer in self.layers:
@@ -92,8 +101,9 @@ class Net:
 
 
 def simple_example():
-    net_1 = Net(architecture=ARCHITECTURE, first_layers=TRAIN)
+    net_1 = Net(architecture=ARCHITECTURE, first_layers=DATA, targets=TARGETS)
     net_1.propagate()
+    net_1.calculate_loss()
     net_1.output_layers()
     plt.show()
 
